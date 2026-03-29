@@ -3,448 +3,456 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>3D Tokyo — Real Map</title>
+<title>3D Tokyo — Interactive Map</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{overflow:hidden;background:#0a0a1a;font-family:-apple-system,BlinkMacSystemFont,sans-serif;touch-action:none}
 canvas{display:block}
-#loading{position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0a1a;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;color:#fff;font-size:1.2em;transition:opacity 0.5s}
+#loading{position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(180deg,#0a0a1a,#0d1117);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;color:#fff;transition:opacity 0.8s}
 #loading.hide{opacity:0;pointer-events:none}
-.spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.2);border-top-color:#ff4500;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:20px}
+.spinner{width:50px;height:50px;border:3px solid rgba(255,69,0,.2);border-top-color:#ff4500;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:20px}
 @keyframes spin{to{transform:rotate(360deg)}}
-#controls{position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,26,.92);backdrop-filter:blur(12px);padding:8px;z-index:10;display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-height:40vh;overflow-y:auto;border-top:1px solid rgba(255,255,255,.1)}
-#controls button{background:rgba(255,255,255,.08);color:#e0e0e0;border:1px solid rgba(255,255,255,.15);padding:8px 12px;border-radius:8px;font-size:.8em;cursor:pointer;transition:all .2s;white-space:nowrap;min-width:80px}
-#controls button:hover,#controls button:active{background:rgba(255,255,255,.18);transform:scale(1.03)}
-#controls button .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
-#resetBtn{background:rgba(255,69,0,.2)!important;border-color:rgba(255,69,0,.4)!important;color:#ff6b35!important}
-#info{position:fixed;top:10px;left:10px;color:rgba(255,255,255,.7);font-size:.75em;z-index:10;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.8)}
-#label{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:1.4em;font-weight:700;text-shadow:0 2px 10px rgba(0,0,0,.8);opacity:0;transition:opacity .4s;pointer-events:none;z-index:10}
+#loading .subtitle{color:rgba(255,255,255,.5);font-size:.85em;margin-top:8px}
+#controls{position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,26,.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);padding:8px 6px;padding-bottom:max(8px,env(safe-area-inset-bottom));z-index:10;display:flex;gap:4px;flex-wrap:wrap;justify-content:center;border-top:1px solid rgba(255,255,255,.08)}
+#controls button{background:rgba(255,255,255,.06);color:#ccc;border:1px solid rgba(255,255,255,.1);padding:8px 14px;border-radius:10px;font-size:.78em;cursor:pointer;transition:all .15s;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+#controls button:active{background:rgba(255,255,255,.15);transform:scale(.97)}
+#resetBtn{background:rgba(255,69,0,.15)!important;border-color:rgba(255,69,0,.3)!important;color:#ff6b35!important}
+#info{position:fixed;top:12px;left:12px;color:rgba(255,255,255,.5);font-size:.7em;z-index:10;pointer-events:none}
+#stats{position:fixed;top:12px;right:12px;color:rgba(255,255,255,.35);font-size:.65em;z-index:10;pointer-events:none;text-align:right}
+#label{position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:1.6em;font-weight:700;text-shadow:0 2px 20px rgba(0,0,0,.9),0 0 40px rgba(255,69,0,.3);opacity:0;transition:opacity .5s;pointer-events:none;z-index:10}
 #label.show{opacity:1}
 </style>
 </head>
 <body>
-<div id="loading"><div class="spinner"></div><div>Loading Tokyo…</div></div>
-<div id="info">🗺️ 3D Tokyo — Real OSM Data</div>
+<div id="loading"><div class="spinner"></div><div>Loading Tokyo…</div><div class="subtitle">Real OpenStreetMap Data</div></div>
+<div id="info">🗼 3D Tokyo</div>
+<div id="stats"></div>
 <div id="label"></div>
 <div id="controls"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
 <script src="mapdata.js"></script>
 <script>
 (function(){
+'use strict';
 const S=MAP_DATA;
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x0a0a1a);
-scene.fog=new THREE.FogExp2(0x0a0a1a,0.00015);
+scene.background=new THREE.Color(0x060612);
+scene.fog=new THREE.FogExp2(0x060612,0.00012);
 
-const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,1,20000);
-camera.position.set(0,800,1200);
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,1,25000);
+camera.position.set(0,900,1500);
 
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setSize(innerWidth,innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.shadowMap.enabled=false;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.2;
 document.body.appendChild(renderer.domElement);
 
 const controls=new THREE.OrbitControls(camera,renderer.domElement);
 controls.enableDamping=true;
-controls.dampingFactor=0.08;
-controls.maxPolarAngle=Math.PI*0.48;
-controls.minDistance=50;
-controls.maxDistance=4000;
+controls.dampingFactor=0.06;
+controls.maxPolarAngle=Math.PI*0.47;
+controls.minDistance=30;
+controls.maxDistance=5000;
 controls.target.set(0,0,0);
 controls.touches={ONE:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_PAN};
 
-// Lighting
-const ambient=new THREE.AmbientLight(0x1a1a3a,0.6);
-scene.add(ambient);
-const dirLight=new THREE.DirectionalLight(0x334477,0.3);
-dirLight.position.set(-500,1000,500);
-scene.add(dirLight);
-const hemi=new THREE.HemisphereLight(0x111133,0x080810,0.4);
-scene.add(hemi);
+// --- LIGHTING ---
+scene.add(new THREE.AmbientLight(0x1a1a3e,0.5));
+const moonLight=new THREE.DirectionalLight(0x3355aa,0.25);
+moonLight.position.set(-800,1500,400);
+scene.add(moonLight);
+scene.add(new THREE.HemisphereLight(0x111133,0x060608,0.3));
 
-// Ground plane
-const groundGeo=new THREE.PlaneGeometry(14000,14000);
-const groundMat=new THREE.MeshStandardMaterial({color:0x0d0d1a,roughness:0.95});
+// Subtle warm glow from below (city light bounce)
+const cityGlow=new THREE.PointLight(0xff6622,0.3,5000,2);
+cityGlow.position.set(0,50,0);
+scene.add(cityGlow);
+
+// --- GROUND ---
+const groundGeo=new THREE.PlaneGeometry(16000,16000);
+const groundMat=new THREE.MeshStandardMaterial({color:0x080810,roughness:0.95,metalness:0.05});
 const ground=new THREE.Mesh(groundGeo,groundMat);
 ground.rotation.x=-Math.PI/2;
 ground.position.y=-0.5;
 scene.add(ground);
 
-// Colors for building types
-const typeColors={
-    'yes':{base:0x2a2a3a,emissive:0x0a0a15},
-    'commercial':{base:0x2d3040,emissive:0x0d1020},
-    'retail':{base:0x2d2a35,emissive:0x0d0a15},
-    'apartments':{base:0x282838,emissive:0x08081a},
-    'office':{base:0x303545,emissive:0x101525},
-    'hotel':{base:0x352a35,emissive:0x150a15},
-    'house':{base:0x252530,emissive:0x050510},
-    'university':{base:0x2a3030,emissive:0x0a1010},
-    'school':{base:0x2a2d30,emissive:0x0a0d10},
-    'roof':{base:0x222230,emissive:0x020210},
-};
+// Subtle ground grid
+const gridHelper=new THREE.GridHelper(12000,60,0x111122,0x0a0a15);
+gridHelper.position.y=-0.3;
+scene.add(gridHelper);
 
-function getColor(btype){
-    const c=typeColors[btype]||typeColors['yes'];
-    // Add slight variation
-    const v=0.9+Math.random()*0.2;
-    return{
-        base:new THREE.Color(c.base).multiplyScalar(v),
-        emissive:new THREE.Color(c.emissive).multiplyScalar(v*1.5)
-    };
-}
-
-// Build real buildings
-const buildingGroup=new THREE.Group();
-const windowGeo=new THREE.PlaneGeometry(1.2,1.8);
-
-let totalVerts=0;
-const MAX_VERTS=2000000;
-
-for(let i=0;i<S.buildings.length&&totalVerts<MAX_VERTS;i++){
-    const b=S.buildings[i];
-    const pts=b.p;
-    if(pts.length<3)continue;
-
-    const colors=getColor(b.t);
-    const h=b.h||10;
-
-    // Create shape from polygon
-    const shape=new THREE.Shape();
-    shape.moveTo(pts[0][0],-pts[0][1]);
-    for(let j=1;j<pts.length;j++){
-        shape.lineTo(pts[j][0],-pts[j][1]);
-    }
-    shape.closePath();
-
-    try{
-        const geo=new THREE.ExtrudeGeometry(shape,{
-            depth:h,
-            bevelEnabled:false,
-            steps:1
-        });
-        
-        const mat=new THREE.MeshStandardMaterial({
-            color:colors.base,
-            emissive:colors.emissive,
-            emissiveIntensity:0.4+Math.random()*0.3,
-            roughness:0.85,
-            metalness:0.1
-        });
-
-        const mesh=new THREE.Mesh(geo,mat);
-        mesh.rotation.x=-Math.PI/2;
-        mesh.position.y=0;
-        buildingGroup.add(mesh);
-        totalVerts+=geo.attributes.position.count;
-
-        // Window lights on taller buildings
-        if(h>20&&totalVerts<MAX_VERTS*0.8){
-            const cx=pts.reduce((s,p)=>s+p[0],0)/pts.length;
-            const cz=pts.reduce((s,p)=>s+p[1],0)/pts.length;
-            const windowMat=new THREE.MeshBasicMaterial({
-                color:new THREE.Color().setHSL(0.12+Math.random()*0.08,0.6,0.6),
-                transparent:true,
-                opacity:0.5+Math.random()*0.4
-            });
-            const wRows=Math.min(Math.floor(h/5),8);
-            for(let row=0;row<wRows;row++){
-                const y=row*5+3;
-                for(let side=0;side<pts.length-1;side++){
-                    if(Math.random()>0.4)continue;
-                    const px=(pts[side][0]+pts[side+1][0])/2;
-                    const pz=(pts[side][1]+pts[side+1][1])/2;
-                    const w=new THREE.Mesh(windowGeo,windowMat);
-                    const dx=px-cx,dz=pz-cz;
-                    const len=Math.sqrt(dx*dx+dz*dz);
-                    if(len<1)continue;
-                    w.position.set(px,y,pz);
-                    w.lookAt(px+dx/len*10,y,pz+dz/len*10);
-                    buildingGroup.add(w);
-                }
-            }
-        }
-    }catch(e){}
-}
-scene.add(buildingGroup);
-
-// Roads
-const roadGroup=new THREE.Group();
-for(const r of S.roads){
-    if(r.p.length<2)continue;
-    const pts=r.p.map(p=>new THREE.Vector3(p[0],0.05,-p[1]));
-    const curve=new THREE.CatmullRomCurve3(pts,false);
-    const segs=Math.max(2,Math.floor(curve.getLength()/20));
-    const tubeGeo=new THREE.TubeGeometry(curve,segs,r.w*0.5,3,false);
-    const roadMat=new THREE.MeshStandardMaterial({
-        color:r.w>6?0x1a1a28:0x141420,
-        emissive:0x060610,
-        emissiveIntensity:r.w>6?0.5:0.2,
-        roughness:0.7
-    });
-    roadGroup.add(new THREE.Mesh(tubeGeo,roadMat));
-}
-scene.add(roadGroup);
-
-// Water
+// --- WATER ---
 for(const w of S.water){
     const shape=new THREE.Shape();
     shape.moveTo(w.p[0][0],-w.p[0][1]);
-    for(let i=1;i<w.p.length;i++)shape.lineTo(w.p[i][0],-w.p[i][1]);
+    for(let i=1;i<w.p.length;i++) shape.lineTo(w.p[i][0],-w.p[i][1]);
     shape.closePath();
     const geo=new THREE.ShapeGeometry(shape);
     const mat=new THREE.MeshStandardMaterial({
-        color:0x0a1525,
-        emissive:0x051020,
-        emissiveIntensity:0.8,
-        transparent:true,
-        opacity:0.85,
-        roughness:0.3,
-        metalness:0.6
+        color:0x081828,emissive:0x041020,emissiveIntensity:1.0,
+        transparent:true,opacity:0.9,roughness:0.2,metalness:0.7
     });
     const mesh=new THREE.Mesh(geo,mat);
-    mesh.rotation.x=-Math.PI/2;
-    mesh.position.y=0.1;
+    mesh.rotation.x=-Math.PI/2;mesh.position.y=0.15;
     scene.add(mesh);
 }
 
-// Landmarks — distinctive shapes
+// --- BUILDINGS ---
+const buildingGroup=new THREE.Group();
+const typeStyles={
+    'yes':{base:0x1e1e2e,emissive:0x08080f,ei:0.4},
+    'commercial':{base:0x222538,emissive:0x0a0e1a,ei:0.5},
+    'retail':{base:0x252030,emissive:0x0c0815,ei:0.5},
+    'apartments':{base:0x1c1c30,emissive:0x06061a,ei:0.4},
+    'office':{base:0x283040,emissive:0x0c1520,ei:0.6},
+    'hotel':{base:0x302535,emissive:0x150a18,ei:0.5},
+    'house':{base:0x181820,emissive:0x040408,ei:0.3},
+};
+
+function getStyle(btype){
+    return typeStyles[btype]||typeStyles['yes'];
+}
+
+// Use InstancedMesh for performance with simple box buildings
+const buildingMaterials={};
+let totalPolys=0;
+
+for(let i=0;i<S.buildings.length;i++){
+    const b=S.buildings[i];
+    const pts=b.p;
+    if(pts.length<3)continue;
+    const h=Math.max(b.h,3);
+    const style=getStyle(b.t);
+    
+    // Calculate bounding box of polygon
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    for(const p of pts){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
+    
+    const w=maxX-minX, d=maxY-minY;
+    const cx=(minX+maxX)/2, cz=(minY+maxY)/2;
+    
+    // Simple buildings: box approximation
+    const geo=new THREE.BoxGeometry(w,h,d);
+    const variation=0.85+Math.random()*0.3;
+    const baseColor=new THREE.Color(style.base).multiplyScalar(variation);
+    const emColor=new THREE.Color(style.emissive).multiplyScalar(variation*1.5);
+    
+    const mat=new THREE.MeshStandardMaterial({
+        color:baseColor,emissive:emColor,emissiveIntensity:style.ei+Math.random()*0.2,
+        roughness:0.8+Math.random()*0.15,metalness:0.05+Math.random()*0.1
+    });
+    
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.position.set(cx,h/2,cz);
+    buildingGroup.add(mesh);
+    totalPolys++;
+    
+    // Window lights for taller buildings
+    if(h>18&&totalPolys<8000){
+        const winMat=new THREE.MeshBasicMaterial({
+            color:new THREE.Color().setHSL(0.1+Math.random()*0.1,0.5,0.55),
+            transparent:true,opacity:0.35+Math.random()*0.4
+        });
+        const rows=Math.min(Math.floor(h/6),6);
+        const cols=Math.max(2,Math.floor(w/8));
+        for(let r=0;r<rows;r++){
+            for(let c=0;c<cols;c++){
+                if(Math.random()>0.55)continue;
+                const wg=new THREE.PlaneGeometry(1.5,2.2);
+                // Front face
+                const wm=new THREE.Mesh(wg,winMat);
+                wm.position.set(cx-w/2+3+c*(w-4)/(cols-1||1), 4+r*6, cz+d/2+0.2);
+                buildingGroup.add(wm);
+                // Back face
+                const wm2=new THREE.Mesh(wg,winMat);
+                wm2.position.set(cx-w/2+3+c*(w-4)/(cols-1||1), 4+r*6, cz-d/2-0.2);
+                wm2.rotation.y=Math.PI;
+                buildingGroup.add(wm2);
+            }
+        }
+    }
+}
+scene.add(buildingGroup);
+document.getElementById('stats').textContent=S.buildings.length+' buildings · '+S.roads.length+' roads';
+
+// --- ROADS (brighter) ---
+const roadGroup=new THREE.Group();
+const roadStyles={
+    'motorway':{color:0x2a2a45,emissive:0x1515aa,ei:0.8,w:1},
+    'trunk':{color:0x252540,emissive:0x121288,ei:0.6,w:1},
+    'primary':{color:0x202038,emissive:0x0e0e66,ei:0.5,w:1},
+    'secondary':{color:0x1a1a30,emissive:0x0a0a44,ei:0.4,w:1},
+    'tertiary':{color:0x151525,emissive:0x060622,ei:0.3,w:1},
+    'motorway_link':{color:0x222240,emissive:0x0e0e66,ei:0.5,w:1},
+    'trunk_link':{color:0x202035,emissive:0x0a0a44,ei:0.4,w:1},
+    'primary_link':{color:0x1a1a30,emissive:0x080833,ei:0.3,w:1},
+};
+
+for(const r of S.roads){
+    if(r.p.length<2)continue;
+    const pts=r.p.map(p=>new THREE.Vector3(p[0],0.3,-p[1]));
+    const curve=new THREE.CatmullRomCurve3(pts,false);
+    const segs=Math.max(2,Math.floor(curve.getLength()/30));
+    const rs=roadStyles[r.t]||roadStyles['secondary'];
+    const geo=new THREE.TubeGeometry(curve,segs,r.w*0.4,4,false);
+    const mat=new THREE.MeshStandardMaterial({
+        color:rs.color,emissive:rs.emissive,emissiveIntensity:rs.ei,
+        roughness:0.5,metalness:0.2
+    });
+    roadGroup.add(new THREE.Mesh(geo,mat));
+}
+scene.add(roadGroup);
+
+// --- DISTRICT LABELS ---
+const labelGroup=new THREE.Group();
+for(const d of S.districts){
+    const sprite=new THREE.Sprite(new THREE.SpriteMaterial({
+        color:0x888899,transparent:true,opacity:0.45,depthTest:false
+    }));
+    sprite.position.set(d.x,60,d.z);
+    sprite.scale.set(0.01,0.01,0.01);
+    scene.add(sprite);
+    
+    // Text label using canvas texture
+    const canvas=document.createElement('canvas');
+    canvas.width=256;canvas.height=64;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='rgba(255,255,255,0.6)';
+    ctx.font='bold 28px -apple-system,sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(d.n,128,40);
+    const tex=new THREE.CanvasTexture(canvas);
+    const label=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,opacity:0.55,depthTest:false}));
+    label.position.set(d.x,65,d.z);
+    const aspect=canvas.width/canvas.height;
+    const scale=120;
+    label.scale.set(scale*aspect,scale,1);
+    scene.add(label);
+}
+
+// --- LANDMARKS ---
 const landmarkGroup=new THREE.Group();
-const landmarkPositions=[];
+const landmarkList=[];
 
 for(const[key,lm]of Object.entries(S.landmarks)){
-    const x=lm.x,z=-lm.z,h=lm.h;
+    const x=lm.x,z=lm.z,h=lm.h;
     const color=new THREE.Color(lm.color);
     const group=new THREE.Group();
     group.position.set(x,0,z);
 
     if(key==='tokyo_tower'){
-        // Triangular lattice tower - red
-        const coneGeo=new THREE.ConeGeometry(25,Math.min(h,250),4);
-        const coneMat=new THREE.MeshStandardMaterial({color:0xff3300,emissive:0xff2200,emissiveIntensity:0.5,roughness:0.5});
-        group.add(new THREE.Mesh(coneGeo,coneMat));
-        group.children[0].position.y=Math.min(h,250)/2;
-        // Antenna
-        const antGeo=new THREE.CylinderGeometry(1,2,80,6);
-        group.add(new THREE.Mesh(antGeo,coneMat));
-        group.children[1].position.y=Math.min(h,250)+40;
-        // Glow
-        const glowGeo=new THREE.SphereGeometry(40,16,16);
-        const glowMat=new THREE.MeshBasicMaterial({color:0xff4500,transparent:true,opacity:0.15});
-        group.add(new THREE.Mesh(glowGeo,glowMat));
-        group.children[2].position.y=Math.min(h,250)/2;
-    }else if(key==='skytree'){
-        // Tall slim tower
-        const bodyGeo=new THREE.CylinderGeometry(8,30,Math.min(h,400),6);
-        const bodyMat=new THREE.MeshStandardMaterial({color:0x88ccff,emissive:0x4488cc,emissiveIntensity:0.6,roughness:0.3,metalness:0.5});
-        group.add(new THREE.Mesh(bodyGeo,bodyMat));
-        group.children[0].position.y=Math.min(h,400)/2;
+        // Red lattice tower - cone + antenna
+        const body=new THREE.ConeGeometry(22,280,4);
+        const mat=new THREE.MeshStandardMaterial({color:0xcc2200,emissive:0xff3300,emissiveIntensity:0.6,roughness:0.4,metalness:0.3});
+        const m=new THREE.Mesh(body,mat);m.position.y=140;group.add(m);
+        const ant=new THREE.CylinderGeometry(0.8,3,80,6);
+        const am=new THREE.Mesh(ant,mat);am.position.y=320;group.add(am);
         // Observation deck
-        const deckGeo=new THREE.CylinderGeometry(35,35,15,8);
-        const deckMat=new THREE.MeshStandardMaterial({color:0x6699cc,emissive:0x3366aa,emissiveIntensity:0.7});
-        group.add(new THREE.Mesh(deckGeo,deckMat));
-        group.children[1].position.y=250;
-        // Antenna
-        const antGeo=new THREE.CylinderGeometry(0.5,3,120,6);
-        group.add(new THREE.Mesh(antGeo,bodyMat));
-        group.children[2].position.y=Math.min(h,400)+60;
-        // Glow
-        const glowGeo=new THREE.SphereGeometry(50,16,16);
-        const glowMat=new THREE.MeshBasicMaterial({color:0x4fc3f7,transparent:true,opacity:0.12});
-        group.add(new THREE.Mesh(glowGeo,glowMat));
-        group.children[3].position.y=300;
+        const deck=new THREE.CylinderGeometry(28,28,8,8);
+        const dm=new THREE.Mesh(deck,new THREE.MeshStandardMaterial({color:0xff4400,emissive:0xff2200,emissiveIntensity:0.8}));
+        dm.position.y=200;group.add(dm);
+    }else if(key==='skytree'){
+        const body=new THREE.CylinderGeometry(6,28,400,6);
+        const mat=new THREE.MeshStandardMaterial({color:0x6699dd,emissive:0x3377bb,emissiveIntensity:0.7,roughness:0.3,metalness:0.5});
+        group.add(new THREE.Mesh(body,mat));group.children[0].position.y=200;
+        const deck=new THREE.CylinderGeometry(30,30,12,8);
+        const dm=new THREE.Mesh(deck,new THREE.MeshStandardMaterial({color:0x88bbee,emissive:0x4488cc,emissiveIntensity:0.9}));
+        dm.position.y=280;group.add(dm);
+        const ant=new THREE.CylinderGeometry(0.3,2,150,6);
+        group.add(new THREE.Mesh(ant,mat));group.children[2].position.y=475;
     }else if(key==='sensoji'){
-        // Temple - low wide building with curved roof feel
-        const baseGeo=new THREE.BoxGeometry(60,12,40);
-        const baseMat=new THREE.MeshStandardMaterial({color:0xcc5533,emissive:0x882211,emissiveIntensity:0.4});
-        group.add(new THREE.Mesh(baseGeo,baseMat));
-        group.children[0].position.y=6;
-        // Roof (wider)
-        const roofGeo=new THREE.BoxGeometry(70,4,50);
-        const roofMat=new THREE.MeshStandardMaterial({color:0x333344,emissive:0x111122,emissiveIntensity:0.3});
-        group.add(new THREE.Mesh(roofGeo,roofMat));
-        group.children[1].position.y=14;
-        // Gate
-        const gateGeo=new THREE.BoxGeometry(30,18,8);
-        group.add(new THREE.Mesh(gateGeo,baseMat));
-        group.children[2].position.set(0,9,30);
+        const baseMat=new THREE.MeshStandardMaterial({color:0xcc4422,emissive:0x882211,emissiveIntensity:0.5});
+        const base=new THREE.Mesh(new THREE.BoxGeometry(55,10,35),baseMat);base.position.y=5;group.add(base);
+        const roof=new THREE.Mesh(new THREE.BoxGeometry(65,3,45),new THREE.MeshStandardMaterial({color:0x222233,emissive:0x111122,emissiveIntensity:0.3}));
+        roof.position.y=12;group.add(roof);
+        const gate=new THREE.Mesh(new THREE.BoxGeometry(25,16,6),baseMat);gate.position.set(0,8,25);group.add(gate);
     }else if(key==='shibuya'){
-        // Intersection - glowing ground plane
-        const crossGeo=new THREE.PlaneGeometry(80,80);
-        const crossMat=new THREE.MeshBasicMaterial({color:0xe040fb,transparent:true,opacity:0.3});
-        const cross=new THREE.Mesh(crossGeo,crossMat);
-        cross.rotation.x=-Math.PI/2;
-        cross.position.y=1;
-        group.add(cross);
-        // Surrounding buildings glow
-        const glowGeo=new THREE.SphereGeometry(60,16,16);
-        const glowMat=new THREE.MeshBasicMaterial({color:0xe040fb,transparent:true,opacity:0.08});
-        group.add(new THREE.Mesh(glowGeo,glowMat));
-        group.children[1].position.y=30;
+        const crossMat=new THREE.MeshBasicMaterial({color:0xe040fb,transparent:true,opacity:0.25});
+        const cross=new THREE.Mesh(new THREE.PlaneGeometry(70,70),crossMat);
+        cross.rotation.x=-Math.PI/2;cross.position.y=0.8;group.add(cross);
     }else if(key==='meiji'){
-        // Torii gate
-        const postMat=new THREE.MeshStandardMaterial({color:0xcc2222,emissive:0x881111,emissiveIntensity:0.5});
-        // Left post
-        const lpGeo=new THREE.BoxGeometry(3,25,3);
-        const lp=new THREE.Mesh(lpGeo,postMat);lp.position.set(-15,12.5,0);group.add(lp);
-        // Right post
-        const rp=new THREE.Mesh(lpGeo,postMat);rp.position.set(15,12.5,0);group.add(rp);
-        // Top bar
-        const tbGeo=new THREE.BoxGeometry(40,3,4);
-        const tb=new THREE.Mesh(tbGeo,postMat);tb.position.y=26;group.add(tb);
-        // Greenery
-        const treeGeo=new THREE.SphereGeometry(30,8,8);
-        const treeMat=new THREE.MeshStandardMaterial({color:0x1a5a1a,emissive:0x0a3a0a,emissiveIntensity:0.4});
-        const tree=new THREE.Mesh(treeGeo,treeMat);tree.position.y=15;tree.scale.set(3,1,3);group.add(tree);
+        const tMat=new THREE.MeshStandardMaterial({color:0xcc1111,emissive:0x880808,emissiveIntensity:0.6});
+        const lp=new THREE.Mesh(new THREE.BoxGeometry(2.5,22,2.5),tMat);lp.position.set(-14,11,0);group.add(lp);
+        const rp=lp.clone();rp.position.set(14,11,0);group.add(rp);
+        const tb=new THREE.Mesh(new THREE.BoxGeometry(38,2.5,3.5),tMat);tb.position.y=24;group.add(tb);
+        const tb2=new THREE.Mesh(new THREE.BoxGeometry(34,2,3),tMat);tb2.position.y=20;group.add(tb2);
+        const tree=new THREE.Mesh(new THREE.SphereGeometry(35,8,6),new THREE.MeshStandardMaterial({color:0x1a5a1a,emissive:0x0a3a0a,emissiveIntensity:0.4}));
+        tree.position.y=12;tree.scale.set(3,0.8,3);group.add(tree);
     }else if(key==='imperial'){
-        // Palace walls + garden
-        const wallMat=new THREE.MeshStandardMaterial({color:0xccaa44,emissive:0x665522,emissiveIntensity:0.3});
-        // Outer wall ring
-        const wallGeo=new THREE.TorusGeometry(80,3,4,24);
-        const wall=new THREE.Mesh(wallGeo,wallMat);
-        wall.rotation.x=-Math.PI/2;wall.position.y=6;
-        group.add(wall);
-        // Inner garden
-        const gardenGeo=new THREE.PlaneGeometry(100,100);
-        const gardenMat=new THREE.MeshStandardMaterial({color:0x1a4a1a,emissive:0x0a2a0a,emissiveIntensity:0.3});
-        const garden=new THREE.Mesh(gardenGeo,gardenMat);
-        garden.rotation.x=-Math.PI/2;garden.position.y=0.3;
-        group.add(garden);
-        // Main building
-        const palaceGeo=new THREE.BoxGeometry(40,10,30);
-        const palace=new THREE.Mesh(palaceGeo,wallMat);palace.position.y=5;
-        group.add(palace);
+        const wallMat=new THREE.MeshStandardMaterial({color:0xbbaa33,emissive:0x665511,emissiveIntensity:0.3});
+        const wall=new THREE.Mesh(new THREE.TorusGeometry(75,2.5,4,20),wallMat);
+        wall.rotation.x=-Math.PI/2;wall.position.y=5;group.add(wall);
+        const garden=new THREE.Mesh(new THREE.PlaneGeometry(90,90),new THREE.MeshStandardMaterial({color:0x1a4a1a,emissive:0x0a2a0a,emissiveIntensity:0.4}));
+        garden.rotation.x=-Math.PI/2;garden.position.y=0.2;group.add(garden);
+        const palace=new THREE.Mesh(new THREE.BoxGeometry(35,8,25),wallMat);palace.position.y=4;group.add(palace);
     }else if(key==='akihabara'){
-        // Neon district - tall glowing buildings
-        const neonColors=[0xff0066,0x00ffaa,0xffaa00,0x0066ff,0xff00ff,0x00ffff];
-        for(let i=0;i<6;i++){
-            const bh=15+Math.random()*40;
-            const bw=8+Math.random()*15;
-            const bGeo=new THREE.BoxGeometry(bw,bh,bw);
-            const nc=neonColors[i%neonColors.length];
-            const bMat=new THREE.MeshStandardMaterial({
-                color:nc,
-                emissive:nc,
-                emissiveIntensity:0.6+Math.random()*0.3,
-                roughness:0.4
-            });
-            const bMesh=new THREE.Mesh(bGeo,bMat);
-            bMesh.position.set((i-3)*18,bh/2,(Math.random()-0.5)*30);
-            group.add(bMesh);
-        }
-        // Neon glow
-        const glowGeo=new THREE.SphereGeometry(80,16,16);
-        const glowMat=new THREE.MeshBasicMaterial({color:0xe91e63,transparent:true,opacity:0.06});
-        group.add(new THREE.Mesh(glowGeo,glowMat));
-        group.children[group.children.length-1].position.y=40;
-    }else if(key==='shinjuku'){
-        // Dense tall buildings cluster
-        const mat1=new THREE.MeshStandardMaterial({color:0x5544aa,emissive:0x2211aa,emissiveIntensity:0.5,roughness:0.4,metalness:0.3});
+        const nc=[0xff0066,0x00ffaa,0xffaa00,0x0066ff,0xff00ff,0x00ffff,0xffff00,0x66ff00];
         for(let i=0;i<8;i++){
-            const bh=60+Math.random()*140;
-            const bw=15+Math.random()*25;
-            const bGeo=new THREE.BoxGeometry(bw,bh,bw);
-            const cm=mat1.clone();
-            cm.emissiveIntensity=0.3+Math.random()*0.5;
-            const bm=new THREE.Mesh(bGeo,cm);
-            bm.position.set((i-4)*25+Math.random()*10,bh/2,(Math.random()-0.5)*40);
-            group.add(bm);
+            const bh=12+Math.random()*45;
+            const bw=6+Math.random()*12;
+            const c=nc[i%nc.length];
+            const bMat=new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:0.7+Math.random()*0.3,roughness:0.3});
+            const b=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bw),bMat);
+            b.position.set((i-4)*16,bh/2,(Math.random()-0.5)*25);
+            group.add(b);
         }
-        const glowGeo=new THREE.SphereGeometry(100,16,16);
-        const glowMat=new THREE.MeshBasicMaterial({color:0x7c4dff,transparent:true,opacity:0.06});
-        group.add(new THREE.Mesh(glowGeo,glowMat));
-        group.children[group.children.length-1].position.y=80;
+    }else if(key==='shinjuku'){
+        for(let i=0;i<10;i++){
+            const bh=50+Math.random()*160;
+            const bw=12+Math.random()*22;
+            const bMat=new THREE.MeshStandardMaterial({
+                color:new THREE.Color().setHSL(0.68+Math.random()*0.08,0.4,0.2),
+                emissive:new THREE.Color().setHSL(0.68+Math.random()*0.08,0.5,0.1),
+                emissiveIntensity:0.4+Math.random()*0.4,roughness:0.4,metalness:0.2
+            });
+            const b=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bw),bMat);
+            b.position.set((i-5)*22+Math.random()*8,bh/2,(Math.random()-0.5)*35);
+            group.add(b);
+        }
     }
 
-    // Beacon light on top
-    const beaconGeo=new THREE.SphereGeometry(3,8,8);
-    const beaconMat=new THREE.MeshBasicMaterial({color:color.clone(),transparent:true,opacity:0.9});
-    const beacon=new THREE.Mesh(beaconGeo,beaconMat);
-    beacon.position.y=h||30;
+    // Beacon light
+    const beacon=new THREE.Mesh(
+        new THREE.SphereGeometry(4,8,8),
+        new THREE.MeshBasicMaterial({color:color.clone(),transparent:true,opacity:0.9})
+    );
+    beacon.position.y=h+10;
+    beacon.name='beacon';
     group.add(beacon);
 
-    // Vertical beam
-    const beamGeo=new THREE.CylinderGeometry(0.5,0.5,h||30,4);
-    const beamMat=new THREE.MeshBasicMaterial({color:color.clone(),transparent:true,opacity:0.15});
-    const beam=new THREE.Mesh(beamGeo,beamMat);
-    beam.position.y=(h||30)/2;
+    // Vertical light beam
+    const beam=new THREE.Mesh(
+        new THREE.CylinderGeometry(0.3,0.3,h+20,4),
+        new THREE.MeshBasicMaterial({color:color.clone(),transparent:true,opacity:0.12})
+    );
+    beam.position.y=(h+20)/2;
     group.add(beam);
 
+    // Ground glow ring
+    const ring=new THREE.Mesh(
+        new THREE.RingGeometry(20,50,24),
+        new THREE.MeshBasicMaterial({color:color.clone(),transparent:true,opacity:0.08,side:THREE.DoubleSide})
+    );
+    ring.rotation.x=-Math.PI/2;ring.position.y=0.5;
+    group.add(ring);
+
     landmarkGroup.add(group);
-    landmarkPositions.push({key,x,z:lm.z,name:lm.name,color:lm.color,group,h});
+    landmarkList.push({key,x,z,name:lm.name,color:lm.color,group,h});
 }
 scene.add(landmarkGroup);
 
-// Stars
+// --- STARS ---
 const starGeo=new THREE.BufferGeometry();
-const starCount=2000;
-const starPos=new Float32Array(starCount*3);
-for(let i=0;i<starCount;i++){
-    starPos[i*3]=(Math.random()-0.5)*16000;
-    starPos[i*3+1]=2000+Math.random()*3000;
-    starPos[i*3+2]=(Math.random()-0.5)*16000;
+const starN=3000;
+const starPos=new Float32Array(starN*3);
+for(let i=0;i<starN;i++){
+    starPos[i*3]=(Math.random()-0.5)*18000;
+    starPos[i*3+1]=1500+Math.random()*4000;
+    starPos[i*3+2]=(Math.random()-0.5)*18000;
 }
 starGeo.setAttribute('position',new THREE.BufferAttribute(starPos,3));
-scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xaaaacc,size:2,transparent:true,opacity:0.6})));
+scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xaaaacc,size:1.5,transparent:true,opacity:0.5})));
 
-// Controls UI
+// --- FLOATING PARTICLES (city dust/fireflies) ---
+const particleCount=1500;
+const particleGeo=new THREE.BufferGeometry();
+const particlePositions=new Float32Array(particleCount*3);
+const particleSpeeds=[];
+for(let i=0;i<particleCount;i++){
+    particlePositions[i*3]=(Math.random()-0.5)*6000;
+    particlePositions[i*3+1]=5+Math.random()*200;
+    particlePositions[i*3+2]=(Math.random()-0.5)*6000;
+    particleSpeeds.push(0.1+Math.random()*0.3);
+}
+particleGeo.setAttribute('position',new THREE.BufferAttribute(particlePositions,3));
+const particles=new THREE.Points(particleGeo,new THREE.PointsMaterial({
+    color:0xffaa44,size:2.5,transparent:true,opacity:0.35,blending:THREE.AdditiveBlending
+}));
+scene.add(particles);
+
+// --- UI CONTROLS ---
 const ctrlDiv=document.getElementById('controls');
 const btns=[
     {label:'🗼 Tokyo Tower',key:'tokyo_tower'},
-    {label:'🏛 Sensō-ji',key:'sensoji'},
+    {label:'⛩ Sensō-ji',key:'sensoji'},
     {label:'🌊 Shibuya',key:'shibuya'},
-    {label:'🗼 Skytree',key:'skytree'},
-    {label:'⛩ Meiji Shrine',key:'meiji'},
-    {label:'🏯 Imperial Palace',key:'imperial'},
+    {label:'📡 Skytree',key:'skytree'},
+    {label:'🌲 Meiji Shrine',key:'meiji'},
+    {label:'🏯 Imperial',key:'imperial'},
     {label:'💡 Akihabara',key:'akihabara'},
     {label:'🌆 Shinjuku',key:'shinjuku'},
-    {label:'🔄 Reset',key:'reset'}
+    {label:'🔄 Reset',key:'_reset'}
 ];
-
 btns.forEach(b=>{
     const btn=document.createElement('button');
-    btn.innerHTML=b.label;
-    if(b.key==='reset')btn.id='resetBtn';
-    btn.onclick=()=>{
-        if(b.key==='reset')flyTo(0,400,800,0,0,0);
+    btn.textContent=b.label;
+    if(b.key==='_reset')btn.id='resetBtn';
+    btn.addEventListener('click',()=>{
+        if(b.key==='_reset')flyTo(0,900,1500,0,0,0);
         else{
-            const lm=landmarkPositions.find(l=>l.key===b.key);
-            if(lm)flyTo(lm.x,lm.h*1.2+100,lm.z+200,lm.x,lm.h*0.3,lm.z);
+            const lm=landmarkList.find(l=>l.key===b.key);
+            if(lm)flyTo(lm.x,lm.h*1.5+120,lm.z-250,lm.x,lm.h*0.4,lm.z);
         }
-    };
+    });
     ctrlDiv.appendChild(btn);
 });
 
+// Camera animation
+let flyAnim=null;
 function flyTo(tx,ty,tz,lx,ly,lz){
-    const label=document.getElementById('label');
-    const lm=landmarkPositions.find(l=>l.x===tx&&l.z===lz);
-    if(lm){label.textContent=lm.name;label.classList.add('show');setTimeout(()=>label.classList.remove('show'),2000);}
+    const lm=landmarkList.find(l=>Math.abs(l.x-tx)<10&&Math.abs(l.z-lz)<10);
+    if(lm){
+        const el=document.getElementById('label');
+        el.textContent=lm.name;
+        el.style.textShadow='0 2px 20px rgba(0,0,0,.9), 0 0 60px '+lm.color+'55';
+        el.classList.add('show');
+        setTimeout(()=>el.classList.remove('show'),2500);
+    }
     const sx=camera.position.x,sy=camera.position.y,sz=camera.position.z;
     const stx=controls.target.x,sty=controls.target.y,stz=controls.target.z;
-    const dur=1500;const start=performance.now();
-    function anim(now){
-        let t=Math.min((now-start)/dur,1);
-        t=t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2; // ease
+    const dur=1800;const t0=performance.now();
+    if(flyAnim)cancelAnimationFrame(flyAnim);
+    function step(now){
+        let t=Math.min((now-t0)/dur,1);
+        t=t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
         camera.position.set(sx+(tx-sx)*t,sy+(ty-sy)*t,sz+(tz-sz)*t);
         controls.target.set(stx+(lx-stx)*t,sty+(ly-sty)*t,stz+(lz-stz)*t);
-        if(t<1)requestAnimationFrame(anim);
+        if(t<1)flyAnim=requestAnimationFrame(step);
+        else flyAnim=null;
     }
-    requestAnimationFrame(anim);
+    flyAnim=requestAnimationFrame(step);
 }
 
-// Animate beacon pulsing
+// --- RENDER LOOP ---
 let time=0;
 function animate(){
     requestAnimationFrame(animate);
-    time+=0.02;
+    time+=0.016;
     controls.update();
-    // Pulse beacons
-    landmarkPositions.forEach((lm,i)=>{
-        const beacon=lm.group.children[lm.group.children.length-2];
-        if(beacon)beacon.material.opacity=0.5+Math.sin(time*2+i)*0.4;
+
+    // Pulse landmark beacons
+    landmarkList.forEach((lm,i)=>{
+        const beacon=lm.group.getObjectByName('beacon');
+        if(beacon)beacon.material.opacity=0.5+Math.sin(time*3+i*1.5)*0.45;
     });
+
+    // Animate particles
+    const pp=particles.geometry.attributes.position.array;
+    for(let i=0;i<particleCount;i++){
+        pp[i*3+1]+=particleSpeeds[i]*0.3;
+        pp[i*3]+=Math.sin(time+i)*0.15;
+        if(pp[i*3+1]>250){
+            pp[i*3+1]=5;
+            pp[i*3]=(Math.random()-0.5)*6000;
+            pp[i*3+2]=(Math.random()-0.5)*6000;
+        }
+    }
+    particles.geometry.attributes.position.needsUpdate=true;
+
     renderer.render(scene,camera);
 }
 
